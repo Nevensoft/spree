@@ -83,7 +83,7 @@ module Spree
         case amount
         when String
           separator = I18n.t('number.currency.format.separator')
-          number    = amount.delete("^0-9-#{separator}").tr(separator, '.')
+          number    = amount.delete("^0-9-#{separator}\.").tr(separator, '.')
           number.to_d if number.present?
         end || amount
     end
@@ -93,7 +93,7 @@ module Spree
     end
 
     def credit_allowed
-      amount - offsets_total
+      amount - offsets_total.abs
     end
 
     def can_credit?
@@ -102,8 +102,8 @@ module Spree
 
     # see https://github.com/spree/spree/issues/981
     def build_source
-      return if source_attributes.nil?
-      if payment_method and payment_method.payment_source_class
+      return unless new_record?
+      if source_attributes.present? && source.blank? && payment_method.try(:payment_source_class)
         self.source = payment_method.payment_source_class.new(source_attributes)
       end
     end

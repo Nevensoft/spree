@@ -1,7 +1,13 @@
 require 'spec_helper'
 
 describe Spree::CreditCard do
-  let(:valid_credit_card_attributes) { {:number => '4111111111111111', :verification_value => '123', :expiry => "12 / 14"} }
+  let(:valid_credit_card_attributes) do
+    {
+      :number => '4111111111111111',
+      :verification_value => '123',
+      :expiry => "12 / #{Time.now.year + 1}"
+    }
+  end
 
   def self.payment_states
     Spree::Payment.state_machine.states.keys
@@ -83,11 +89,40 @@ describe Spree::CreditCard do
       credit_card.errors[:verification_value].should == ["can't be blank"]
     end
 
+    # Regression spec for #4971
+    it "should not bomb out when given an invalid expiry" do
+      credit_card.month = 13
+      credit_card.year = Time.now.year + 1
+      credit_card.should_not be_valid
+      credit_card.errors[:base].should == ["Card expiration is invalid"]
+    end
+
     it "should validate expiration is not in the past" do
       credit_card.month = 1.month.ago.month
       credit_card.year = 1.month.ago.year
       credit_card.should_not be_valid
       credit_card.errors[:base].should == ["Card has expired"]
+    end
+
+    it "should not be expired expiring on the current month" do
+      credit_card.attributes = valid_credit_card_attributes
+      credit_card.month = Time.zone.now.month
+      credit_card.year = Time.zone.now.year
+      credit_card.should be_valid
+    end
+
+    it "should handle TZ correctly" do
+      # The card is valid according to the system clock's local time
+      # (Time.now).
+      # However it has expired in rails's configured time zone (Time.current),
+      # which is the value we should be respecting.
+      time = Time.new(2014, 04, 30, 23, 0, 0, "-07:00")
+      Timecop.freeze(time) do
+        credit_card.month = 1.month.ago.month
+        credit_card.year = 1.month.ago.year
+        credit_card.should_not be_valid
+        credit_card.errors[:base].should == ["Card has expired"]
+      end
     end
 
     it "does not run expiration in the past validation if month is not set" do
@@ -176,9 +211,27 @@ describe Spree::CreditCard do
       expect(credit_card.year).to eq(2014)
     end
 
+    it "can set with a 2-digit month and 4-digit year without whitespace and slash" do
+      credit_card.expiry = '042014'
+      expect(credit_card.month).to eq(4)
+      expect(credit_card.year).to eq(2014)
+    end
+
+    it "can set with a 2-digit month and 2-digit year without whitespace and slash" do
+      credit_card.expiry = '0414'
+      expect(credit_card.month).to eq(4)
+      expect(credit_card.year).to eq(2014)
+    end
+
     it "does not blow up when passed an empty string" do
       lambda { credit_card.expiry = '' }.should_not raise_error
     end
+
+    # Regression test for #4725
+    it "does not blow up when passed one number" do
+      lambda { credit_card.expiry = '12' }.should_not raise_error
+    end
+
   end
 
   context "#cc_type=" do

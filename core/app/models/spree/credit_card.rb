@@ -26,12 +26,19 @@ module Spree
     }
 
     def expiry=(expiry)
-      if expiry.present?
-        self[:month], self[:year] = expiry.delete(' ').split('/')
+      return unless expiry.present?
+
+      self[:month], self[:year] =
+      if expiry.match(/\d\s?\/\s?\d/) # will match mm/yy and mm / yyyy
+        expiry.delete(' ').split('/')
+      elsif match = expiry.match(/(\d{2})(\d{2,4})/) # will match mmyy and mmyyyy
+        [match[1], match[2]]
+      end
+      if self[:year]
         self[:year] = "20" + self[:year] if self[:year].length == 2
         self[:year] = self[:year].to_i
-        self[:month] = self[:month].to_i
       end
+      self[:month] = self[:month].to_i
     end
 
     def number=(num)
@@ -119,9 +126,13 @@ module Spree
 
     def expiry_not_in_the_past
       if year.present? && month.present?
-        time = "#{year}-#{month}-1".to_time
-        if time < Time.zone.now.to_time.beginning_of_month
-          errors.add(:base, :card_expired)
+        if month.to_i < 1 || month.to_i > 12
+          errors.add(:base, :expiry_invalid)
+        else
+          current = Time.current
+          if year.to_i < current.year or (year.to_i == current.year and month.to_i < current.month)
+            errors.add(:base, :card_expired)
+          end
         end
       end
     end

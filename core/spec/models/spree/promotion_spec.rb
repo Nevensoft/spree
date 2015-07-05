@@ -41,6 +41,37 @@ describe Spree::Promotion do
     end
   end
 
+  describe '#exists_on_order?' do
+    let(:promotion) { create :promotion } 
+    let(:order) { create :order }
+    let(:action_1) { Spree::Promotion::Actions::CreateAdjustment.new }
+    let(:action_2) { Spree::Promotion::Actions::CreateAdjustment.new }
+
+    before do
+      promotion.actions << action_1
+      promotion.actions << action_2
+
+      action_1.should_receive(:credit_exists_on_order?).with(order).and_return(false)
+      action_2.should_receive(:credit_exists_on_order?).with(order).and_return(action_2_status)
+    end
+
+    context 'when one returns true' do
+      let(:action_2_status) { true }
+
+      it 'should be true' do
+        promotion.exists_on_order?(order).should be_true
+      end    
+    end
+
+    context 'when none returns true' do
+      let(:action_2_status) { false }
+
+      it 'should be false' do
+        promotion.exists_on_order?(order).should be_false
+      end 
+    end
+  end
+
   describe ".advertised" do
     let(:promotion) { create(:promotion) }
     let(:advertised_promotion) { create(:promotion, :advertise => true) }
@@ -72,8 +103,8 @@ describe Spree::Promotion do
 
   describe "#activate" do
     before do
-      @action1 = mock_model(Spree::PromotionAction, :perform => true)
-      @action2 = mock_model(Spree::PromotionAction, :perform => true)
+      @action1 = stub_model(Spree::PromotionAction, :perform => true)
+      @action2 = stub_model(Spree::PromotionAction, :perform => true)
       promotion.promotion_actions = [@action1, @action2]
       promotion.created_at = 2.days.ago
 
@@ -305,14 +336,14 @@ describe Spree::Promotion do
       before { promotion.match_policy = 'all' }
 
       it "should have eligible rules if all rules are eligible" do
-        promotion.promotion_rules = [mock_model(Spree::PromotionRule, :eligible? => true),
-                                     mock_model(Spree::PromotionRule, :eligible? => true)]
+        promotion.promotion_rules = [stub_model(Spree::PromotionRule, :eligible? => true),
+                                     stub_model(Spree::PromotionRule, :eligible? => true)]
         promotion.rules_are_eligible?(@order).should be_true
       end
 
       it "should not have eligible rules if any of the rules is not eligible" do
-        promotion.promotion_rules = [mock_model(Spree::PromotionRule, :eligible? => true),
-                                     mock_model(Spree::PromotionRule, :eligible? => false)]
+        promotion.promotion_rules = [stub_model(Spree::PromotionRule, :eligible? => true),
+                                     stub_model(Spree::PromotionRule, :eligible? => false)]
         promotion.rules_are_eligible?(@order).should be_false
       end
     end

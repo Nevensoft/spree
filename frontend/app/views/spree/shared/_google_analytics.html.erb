@@ -5,7 +5,7 @@
     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
 
-    ga('create', '<%= tracker.analytics_id %>');
+    ga('create', '<%= tracker.analytics_id %>','<%= Spree::Config[:site_url].sub!(/^www./,'') %>');
     ga('send', 'pageview');
 
     <% if flash[:commerce_tracking] && @order.present? %>
@@ -17,7 +17,7 @@
         'revenue': '<%= @order.total %>',                                // Grand Total.
         'shipping': '<%= @order.adjustments.shipping.sum(:amount) %>',  // Shipping.
         'tax': '<%= @order.adjustments.tax.sum(:amount) %>',           // Tax.
-        'currencyCode': '<%= current_currency %>'                     // local currency code.
+        'currency': '<%= current_currency %>'                        // local currency code.
       });
       <% @order.line_items.each do |line_item| %>
         ga('ecommerce:addItem', {

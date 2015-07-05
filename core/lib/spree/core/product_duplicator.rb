@@ -2,8 +2,12 @@ module Spree
   class ProductDuplicator
     attr_accessor :product
 
-    def initialize(product)
+    @@clone_images_default = true
+    mattr_accessor :clone_images_default
+
+    def initialize(product, include_images = @@clone_images_default)
       @product = product
+      @include_images = include_images
     end
 
     def duplicate
@@ -39,7 +43,7 @@ module Spree
       master.dup.tap do |new_master|
         new_master.sku = "COPY OF #{master.sku}"
         new_master.deleted_at = nil
-        new_master.images = master.images.map { |image| duplicate_image image }
+        new_master.images = master.images.map { |image| duplicate_image image } if @include_images
         new_master.price = master.price
         new_master.currency = master.currency
       end
@@ -49,7 +53,7 @@ module Spree
       new_variant = variant.dup
       new_variant.sku = "COPY OF #{new_variant.sku}"
       new_variant.deleted_at = nil
-      new_variant.option_values = variant.option_values.map { |option_value| option_value.dup}
+      new_variant.option_values = variant.option_values.map { |option_value| option_value}
       new_variant
     end
 

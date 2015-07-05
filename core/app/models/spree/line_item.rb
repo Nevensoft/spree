@@ -1,7 +1,7 @@
 module Spree
   class LineItem < ActiveRecord::Base
     before_validation :adjust_quantity
-    belongs_to :order, class_name: "Spree::Order"
+    belongs_to :order, class_name: "Spree::Order", touch: true
     belongs_to :variant, class_name: "Spree::Variant"
     belongs_to :tax_category, class_name: "Spree::TaxCategory"
 
@@ -63,7 +63,7 @@ module Spree
     end
 
     def sufficient_stock?
-      Stock::Quantifier.new(variant_id).can_supply? quantity
+      Stock::Quantifier.new(variant).can_supply? quantity
     end
 
     def insufficient_stock?

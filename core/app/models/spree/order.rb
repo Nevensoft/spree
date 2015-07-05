@@ -67,6 +67,7 @@ module Spree
 
     validates :email, presence: true, if: :require_email
     validates :email, email: true, if: :require_email, allow_blank: true
+    validates :number, uniqueness: true
     validate :has_available_shipment
     validate :has_available_payment
 
@@ -79,8 +80,12 @@ module Spree
       where(number: number)
     end
 
+    scope :created_between, ->(start_date, end_date) { where(created_at: start_date..end_date) }
+    scope :completed_between, ->(start_date, end_date) { where(completed_at: start_date..end_date) }
+
     def self.between(start_date, end_date)
-      where(created_at: start_date..end_date)
+      ActiveSupport::Deprecation.warn("Order#between will be deprecated in Spree 2.3, please use either Order#created_between or Order#completed_between instead.")
+      self.created_between(start_date, end_date)
     end
 
     def self.by_customer(customer)
@@ -253,15 +258,11 @@ module Spree
       end
     end
 
-    # FIXME refactor this method and implement validation using validates_* utilities
     def generate_order_number
-      record = true
-      while record
+      self.number ||= loop do
         random = "R#{Array.new(9){rand(9)}.join}"
-        record = self.class.where(number: random).first
+        break random unless self.class.exists?(number: random)
       end
-      self.number = random if self.number.blank?
-      self.number
     end
 
     def shipped_shipments
@@ -508,7 +509,7 @@ module Spree
     # to delivery again so that proper updated shipments are created.
     # e.g. customer goes back from payment step and changes order items
     def ensure_updated_shipments
-      if shipments.any?
+      if shipments.any? && !self.completed?
         self.shipments.destroy_all
         restart_checkout_flow
       end
@@ -572,7 +573,7 @@ module Spree
 
       def after_cancel
         shipments.each { |shipment| shipment.cancel! }
-        payments.completed.each { |payment| payment.credit! }
+        payments.completed.each { |payment| payment.cancel! }
 
         send_cancel_email
         self.update_column(:payment_state, 'credit_owed') unless shipped?

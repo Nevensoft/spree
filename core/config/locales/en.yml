@@ -182,6 +182,9 @@ en:
       spree/state:
         one: State
         other: States
+      spree/stock_movement:
+        one: Stock Movement
+        other: Stock Movements
       spree/stock_location:
         one: Stock Location
         other: Stock Locations
@@ -222,6 +225,7 @@ en:
           attributes:
             base:
               card_expired: "Card has expired"
+              expiry_invalid: "Card expiration is invalid"
   devise:
     confirmations:
       confirmed: Your account was successfully confirmed. You are now signed in.
@@ -380,6 +384,7 @@ en:
     back_to_prototypes_list: Back To Prototypes List
     back_to_reports_list: Back To Reports List
     back_to_shipping_categories: Back To Shipping Categories
+    back_to_shipping_categories_list: Back To Shipping Categories List
     back_to_shipping_methods_list: Back To Shipping Methods List
     back_to_states_list: Back To States List
     back_to_stock_locations_list: Back to Stock Locations List

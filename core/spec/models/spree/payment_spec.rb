@@ -10,8 +10,12 @@ describe Spree::Payment do
   end
 
   let(:card) do
-    mock_model(Spree::CreditCard, :number => "4111111111111111",
-                                  :has_payment_profile? => true)
+    Spree::CreditCard.create!(
+      number: "4111111111111111",
+      month: "12",
+      year: Time.now.year + 1,
+      verification_value: "123"
+    )
   end
 
   let(:payment) do
@@ -446,11 +450,12 @@ describe Spree::Payment do
   end
 
   describe "#credit_allowed" do
+    # Regression test for #4403 & #4407
     it "is the difference between offsets total and payment amount" do
       payment.amount = 100
       payment.stub(:offsets_total).and_return(0)
       payment.credit_allowed.should == 100
-      payment.stub(:offsets_total).and_return(80)
+      payment.stub(:offsets_total).and_return(-80)
       payment.credit_allowed.should == 20
     end
   end
@@ -550,15 +555,17 @@ describe Spree::Payment do
   end
 
   describe "#build_source" do
-    it "should build the payment's source" do
-      params = { :amount => 100, :payment_method => gateway,
+    let(:params) do
+      { :amount => 100, :payment_method => gateway,
         :source_attributes => {
           :expiry =>"1 / 99",
           :number => '1234567890123',
           :verification_value => '123'
         }
       }
+    end
 
+    it "should build the payment's source" do
       payment = Spree::Payment.new(params)
       payment.should be_valid
       payment.source.should_not be_nil
@@ -573,6 +580,13 @@ describe Spree::Payment do
       payment.source.should_not be_nil
       payment.source.should have(1).error_on(:number)
       payment.source.should have(1).error_on(:verification_value)
+    end
+
+    it "does not build a new source when duplicating the model with source_attributes set" do
+      payment = create(:payment)
+      payment.source_attributes = params[:source_attributes]
+
+      expect { payment.dup }.to_not change { payment.source }
     end
   end
 
@@ -595,6 +609,14 @@ describe Spree::Payment do
 
     it "contains an IP" do
       payment.gateway_options[:ip].should == order.last_ip_address
+    end
+
+    it "contains the email address from a persisted order" do
+      # Sets the payment's order to a different Ruby object entirely
+      payment.order = Spree::Order.find(payment.order_id)
+      email = 'foo@example.com'
+      order.update_attributes(:email => email)
+      expect(payment.gateway_options[:email]).to eq(email)
     end
   end
 
@@ -694,10 +716,48 @@ describe Spree::Payment do
       its(:amount) { should eql(BigDecimal('1.55')) }
     end
 
-    context "when the amount is nil" do
-      let(:amount) { nil }
+    context "when the locale uses a coma as a decimal separator" do
+      before(:each) do
+        I18n.enforce_available_locales = false
+        I18n.backend.store_translations(:fr, { :number => { :currency => { :format => { :delimiter => ' ', :separator => ',' } } } })
+        I18n.locale = :fr
+        subject.amount = amount
+      end
 
-      its(:amount) { should be_nil }
+      after do
+        I18n.locale = I18n.default_locale
+        I18n.enforce_available_locales = true
+      end
+
+      context "amount is a decimal" do
+        let(:amount) { '2,99' }
+
+        its(:amount) { should eql(BigDecimal('2.99')) }
+      end
+
+      context "amount contains a $ sign" do
+        let(:amount) { '2,99 $' }
+
+        its(:amount) { should eql(BigDecimal('2.99')) }
+      end
+
+      context "amount is a number" do
+        let(:amount) { 2.99 }
+
+        its(:amount) { should eql(BigDecimal('2.99')) }
+      end
+
+      context "amount contains a negative sign" do
+        let(:amount) { '-2,99 $' }
+
+        its(:amount) { should eql(BigDecimal('-2.99')) }
+      end
+
+      context "amount uses a dot as a decimal separator" do
+        let(:amount) { '2.99' }
+
+        its(:amount) { should eql(BigDecimal('2.99')) }
+      end
     end
   end
 
